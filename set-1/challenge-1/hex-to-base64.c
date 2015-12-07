@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
 
 #include <assert.h>
@@ -73,18 +74,18 @@ static int findIndexInToBinaryTable(char *binaryTable, int binaryTable_len, size
 
 int main(void)
 {
-    /* char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"; */
-    /* char *expectedBase64String = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"; */
-    char *hexString = "2FA";
+    char *expectedBase64String = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
+    char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"/*"2FA"*/;
     size_t hexString_len = strlen(hexString);
 
-    char hexStringInBinary[64] = { 0 }; // @FIXME size?! (watch null terminated)
+    char hexStringInBinary[1024] = { 0 }; // @FIXME size?! (watch null terminated)
     /* size_t hexStringInBinary_len = 64; */
 
     int bytesAdded = 0;
 
     for (size_t i = 0; i < hexString_len; i++) {
-        char *pos = strchr(hexChars, hexString[i]);
+        /* printf("Currently at %c\n", toupper(hexString[i])); */
+        char *pos = strchr(hexChars, toupper(hexString[i]));
         assert(pos != NULL && "Failed to find input char in hex chars, input failure.");
 
         /* printf("found %c at %ld binary is %s\n", hexString[i], pos - hexChars, hexCharsToBinaryTable[pos - hexChars]); */
@@ -94,14 +95,15 @@ int main(void)
 
     assert((size_t) (bytesAdded / 4) == hexString_len && "Failed to create binary string from hexstring.");
 
-    printf("hexStringInBinary => %s (strlen: %lu)\n", hexStringInBinary, strlen(hexStringInBinary));
+    /* printf("hexStringInBinary => %s (strlen: %lu)\n", hexStringInBinary, strlen(hexStringInBinary)); */
 
 
     int sextetsCount = ceil(strlen(hexStringInBinary) / 6);
     char base64String[200] = { 0 }; // @FIXME whats the correct size to be allocated?
 
-    /*int */bytesAdded = 0;
+    bytesAdded = 0;
 
+    // @TODO padding!
     for (int i = 0; i < sextetsCount; i++) {
         char currentSextet[7] = { 0 };
         sprintf(currentSextet, "%.*s", 6, hexStringInBinary + (i * 6));
@@ -122,6 +124,7 @@ int main(void)
     assert(bytesAdded == sextetsCount && "Failed to create base64 string from parsing hex binary string sextets.");
 
     printf("base64String => \"%s\" (strlen %lu)\n", base64String, strlen(base64String));
+    assert(strcmp(expectedBase64String, base64String) == 0 && "Conversion failed, base64 string does not match expected value.");
 
     return 0;
 }
