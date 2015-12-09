@@ -55,7 +55,13 @@ char base64CharsToBinaryTable[64][7] = {
 };
 
 
-static int findIndexInToBinaryTable(char *binaryTable, int binaryTable_len, size_t binaryTableEntry_len, char *needle, size_t needle_len)
+static int findIndexInToBinaryTable(
+    const char *binaryTable,
+    int binaryTable_len,
+    size_t binaryTableEntry_len,
+    const char *needle,
+    size_t needle_len
+)
 {
     assert(binaryTableEntry_len == needle_len);
 
@@ -73,62 +79,129 @@ static int findIndexInToBinaryTable(char *binaryTable, int binaryTable_len, size
     return -1;
 }
 
-int main(void)
+static int convertHexStringToBinaryString(const char *hexString, size_t hexString_len, char **out)
 {
-    char *expectedBase64String = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
-    char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"/*"2FA"*/;
-    size_t hexString_len = strlen(hexString);
+    assert(hexString != NULL);
+
+    if (hexString_len == 0) {
+        return -1;
+    }
 
     char *hexStringInBinary = calloc((4 * hexString_len) + 1, sizeof(char));
-    assert(hexStringInBinary != NULL);
+
+    if (hexStringInBinary == NULL) {
+        return -1;
+    }
 
     int bytesAdded = 0;
 
     for (size_t i = 0; i < hexString_len; i++) {
-        /* printf("Currently at %c\n", toupper(hexString[i])); */
         char *pos = strchr(hexChars, toupper(hexString[i]));
         assert(pos != NULL && "Failed to find input char in hex chars, input failure.");
-
-        /* printf("found %c at %ld binary is %s\n", hexString[i], pos - hexChars, hexCharsToBinaryTable[pos - hexChars]); */
 
         bytesAdded += sprintf(hexStringInBinary + bytesAdded, "%s", hexCharsToBinaryTable[pos - hexChars]);
     }
 
     assert((size_t) (bytesAdded / 4) == hexString_len && "Failed to create binary string from hexstring.");
+    *out = hexStringInBinary;
 
-    /* printf("hexStringInBinary => %s (strlen: %lu)\n", hexStringInBinary, strlen(hexStringInBinary)); */
+    return 0;
+}
 
-    int sextetsCount = ceil(strlen(hexStringInBinary) / 6);
+static int convertBinaryStringToBase64String(const char *binaryString, size_t binaryString_len, char **out)
+{
+    assert(binaryString != NULL);
+
+    if (binaryString_len == 0) {
+        return -1;
+    }
+
+    int sextetsCount = ceil(binaryString_len / 6);
     char *base64String = calloc(sextetsCount + 1, sizeof(char));
 
-    bytesAdded = 0;
+    if (base64String == NULL) {
+        return -1;
+    }
 
-    // @TODO padding!
+    int bytesAdded = 0;
+
     for (int i = 0; i < sextetsCount; i++) {
         char currentSextet[7] = { 0 };
-        sprintf(currentSextet, "%.*s", 6, hexStringInBinary + (i * 6));
+        sprintf(currentSextet, "%.*s", 6, binaryString + (i * 6));
 
         int base64CharsIndex = findIndexInToBinaryTable(base64CharsToBinaryTable[0], 64, 6, currentSextet, strlen(currentSextet));
-        assert(base64CharsIndex != -1);
-
-        /* printf( */
-        /*     "current sextet: %s, index in base64 chars: %d, base 64 char: %c\n", */
-        /*     currentSextet, */
-        /*     base64CharsIndex, */
-        /*     base64Chars[base64CharsIndex] */
-        /* ) ;*/
+        assert(base64CharsIndex != -1 && "base64 char not found in binary table.");
 
         bytesAdded += sprintf(base64String + bytesAdded, "%c", base64Chars[base64CharsIndex]);
     }
 
-    assert(bytesAdded == sextetsCount && "Failed to create base64 string from parsing hex binary string sextets.");
+    // @TODO padding!
+
+    assert(bytesAdded == sextetsCount && "Failed to create base64 string from parsing binary string sextets.");
+    *out = base64String;
+
+    return 0;
+}
+
+static int isValidHexString(const char *hexString)
+{
+    return hexString[strspn(hexString, "0123456789abcdefABCDEF")] == 0;
+}
+
+static int convertHexStringToBase64String(const char *hexString, size_t hexString_len, char **out)
+{
+    assert(hexString != NULL);
+
+    if (hexString_len == 0) {
+        return -1;
+    }
+
+    if (!isValidHexString(hexString)) {
+        return -1;
+    }
+
+    char *hexStringInBinary = NULL;
+    char *base64String = NULL;
+
+    int rc = convertHexStringToBinaryString(hexString, hexString_len, &hexStringInBinary);
+
+    if (rc != 0) {
+        goto error;
+    }
+
+    rc = convertBinaryStringToBase64String(hexStringInBinary, strlen(hexStringInBinary), &base64String);
+
+    if (rc != 0) {
+        goto error;
+    }
+
+    assert(base64String != NULL);
+    *out = base64String;
+
+    free(hexStringInBinary);
+
+    return 0;
+
+error:
+    free(hexStringInBinary);
+    free(base64String);
+
+    return -1;
+}
+
+int main(void)
+{
+    char *expectedBase64String = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
+    char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
+    size_t hexString_len = strlen(hexString);
+
+    char *base64String = NULL;
+    int rc = convertHexStringToBase64String(hexString, hexString_len, &base64String);
+    assert(rc == 0 && "Failed to convert hex string to base64.");
 
     printf("base64String => \"%s\" (strlen %lu)\n", base64String, strlen(base64String));
     assert(strcmp(expectedBase64String, base64String) == 0 && "Conversion failed, base64 string does not match expected value.");
 
-
-    // cleanup
-    free(hexStringInBinary);
     free(base64String);
 
     return 0;
