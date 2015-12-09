@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -78,8 +79,8 @@ int main(void)
     char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"/*"2FA"*/;
     size_t hexString_len = strlen(hexString);
 
-    char hexStringInBinary[1024] = { 0 }; // @FIXME size?! (watch null terminated)
-    /* size_t hexStringInBinary_len = 64; */
+    char *hexStringInBinary = calloc((4 * hexString_len) + 1, sizeof(char));
+    assert(hexStringInBinary != NULL);
 
     int bytesAdded = 0;
 
@@ -97,9 +98,8 @@ int main(void)
 
     /* printf("hexStringInBinary => %s (strlen: %lu)\n", hexStringInBinary, strlen(hexStringInBinary)); */
 
-
     int sextetsCount = ceil(strlen(hexStringInBinary) / 6);
-    char base64String[200] = { 0 }; // @FIXME whats the correct size to be allocated?
+    char *base64String = calloc(sextetsCount + 1, sizeof(char));
 
     bytesAdded = 0;
 
@@ -125,6 +125,11 @@ int main(void)
 
     printf("base64String => \"%s\" (strlen %lu)\n", base64String, strlen(base64String));
     assert(strcmp(expectedBase64String, base64String) == 0 && "Conversion failed, base64 string does not match expected value.");
+
+
+    // cleanup
+    free(hexStringInBinary);
+    free(base64String);
 
     return 0;
 }
