@@ -68,8 +68,6 @@ static int findIndexInToBinaryTable(
             return i;
         }
 
-        // @TODO break here if last?! see http://stackoverflow.com/questions/25303647/accesing-a-2d-array-using-a-single-pointer
-
         // assuming table consists of \0 terminated strings
         binaryTable += (binaryTableEntry_len + 1);
     }
