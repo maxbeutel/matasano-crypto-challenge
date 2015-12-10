@@ -1,12 +1,12 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <math.h>
 
 #include <assert.h>
 
-#define UNUSED(x) (void)(x)
+#include "hextobase64.h"
+
+// debug
+#include <stdio.h>
 
 char hexChars[16] = {
     '0',
@@ -99,8 +99,12 @@ static int convertHexStringToBinaryString(const char *hexString, size_t hexStrin
         char *pos = strchr(hexChars, toupper(hexString[i]));
         assert(pos != NULL && "Failed to find input char in hex chars, input failure.");
 
+        /* printf("hexStringInBinary '%s', len %lu\n", hexStringInBinary, strlen(hexStringInBinary)); */
+
         bytesAdded += sprintf(hexStringInBinary + bytesAdded, "%s", hexCharsToBinaryTable[pos - hexChars]);
     }
+
+    /* printf("hexStringInBinary '%s', len %lu\n", hexStringInBinary, strlen(hexStringInBinary)); */
 
     assert((size_t) (bytesAdded / 4) == hexString_len && "Failed to create binary string from hexstring.");
     *out = hexStringInBinary;
@@ -116,7 +120,8 @@ static int convertBinaryStringToBase64String(const char *binaryString, size_t bi
         return -1;
     }
 
-    int sextetsCount = ceil(binaryString_len / 6);
+    int sextetsCount = (binaryString_len + (6 - 1)) / 6; // round up
+    /* printf("sextets count %d of string len %lu\n", sextetsCount, binaryString_len); */
     char *base64String = calloc(sextetsCount + 1, sizeof(char));
 
     if (base64String == NULL) {
@@ -124,18 +129,58 @@ static int convertBinaryStringToBase64String(const char *binaryString, size_t bi
     }
 
     int bytesAdded = 0;
+    int paddingCharsAdded = 0;
 
     for (int i = 0; i < sextetsCount; i++) {
-        char currentSextet[7] = { 0 };
-        sprintf(currentSextet, "%.*s", 6, binaryString + (i * 6));
+        size_t remainingBinaryStringLength = binaryString_len - (i * 6);
 
-        int base64CharsIndex = findIndexInToBinaryTable(base64CharsToBinaryTable[0], 64, 6, currentSextet, strlen(currentSextet));
-        assert(base64CharsIndex != -1 && "base64 char not found in binary table.");
+        if (remainingBinaryStringLength < 6) {
+            /* printf("less then one sextet left, needs padding\n"); */
 
-        bytesAdded += sprintf(base64String + bytesAdded, "%c", base64Chars[base64CharsIndex]);
+            char currentSextet[7] = { 0 };
+            sprintf(currentSextet, "%.*s", (int) remainingBinaryStringLength, binaryString + (i * 6));
+
+            /* printf("current sextet before appending 0s => %s\n", currentSextet); */
+
+            for (int j = remainingBinaryStringLength; j < 6; j++) {
+                if (currentSextet[j] == '\0') {
+                    currentSextet[j] = '0';
+                }
+            }
+
+            /* printf("current sextet after appending 0s => %s\n", currentSextet); */
+
+
+            // binary string is now padded, we look up this one in the table
+            int base64CharsIndex = findIndexInToBinaryTable(base64CharsToBinaryTable[0], 64, 6, currentSextet, strlen(currentSextet));
+            assert(base64CharsIndex != -1 && "base64 char not found in binary table.");
+
+            /* printf("found char with padding: %c\n", base64Chars[base64CharsIndex]); */
+
+            // add this one char found based on 0-padded binary string
+            bytesAdded += sprintf(base64String + bytesAdded, "%c", base64Chars[base64CharsIndex]);
+
+            /* printf("need to fill up %lu times\n", (6 - remainingBinaryStringLength) / 2); */
+
+            // now fill up all remaining bytes with base64 padding char =
+            for (size_t j = 0; j < (6 - remainingBinaryStringLength) / 2; j++) {
+                /* printf("filling up\n"); */
+                paddingCharsAdded += sprintf(base64String + bytesAdded + paddingCharsAdded, "%c", '=');
+            }
+        } else {
+            /* printf("current sextet: %.*s, bytes added so far %d, binary chars left %lu\n", 6, binaryString + (i * 6), bytesAdded, remainingBinaryStringLength); */
+
+            char currentSextet[7] = { 0 };
+            sprintf(currentSextet, "%.*s", 6, binaryString + (i * 6));
+
+            int base64CharsIndex = findIndexInToBinaryTable(base64CharsToBinaryTable[0], 64, 6, currentSextet, strlen(currentSextet));
+            assert(base64CharsIndex != -1 && "base64 char not found in binary table.");
+
+            /* printf("found char NO padding: %c\n", base64Chars[base64CharsIndex]); */
+
+            bytesAdded += sprintf(base64String + bytesAdded, "%c", base64Chars[base64CharsIndex]);
+        }
     }
-
-    // @TODO padding!
 
     assert(bytesAdded == sextetsCount && "Failed to create base64 string from parsing binary string sextets.");
     *out = base64String;
@@ -148,7 +193,7 @@ static int isValidHexString(const char *hexString)
     return hexString[strspn(hexString, "0123456789abcdefABCDEF")] == 0;
 }
 
-static int convertHexStringToBase64String(const char *hexString, size_t hexString_len, char **out)
+int convertHexStringToBase64String(const char *hexString, size_t hexString_len, char **out)
 {
     assert(hexString != NULL);
 
@@ -187,22 +232,4 @@ error:
     free(base64String);
 
     return -1;
-}
-
-int main(void)
-{
-    char *expectedBase64String = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
-    char *hexString = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
-    size_t hexString_len = strlen(hexString);
-
-    char *base64String = NULL;
-    int rc = convertHexStringToBase64String(hexString, hexString_len, &base64String);
-    assert(rc == 0 && "Failed to convert hex string to base64.");
-
-    printf("base64String => \"%s\" (strlen %lu)\n", base64String, strlen(base64String));
-    assert(strcmp(expectedBase64String, base64String) == 0 && "Conversion failed, base64 string does not match expected value.");
-
-    free(base64String);
-
-    return 0;
 }
