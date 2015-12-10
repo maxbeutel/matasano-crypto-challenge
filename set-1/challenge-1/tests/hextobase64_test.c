@@ -33,6 +33,13 @@ char *test_conversion()
     // foobar
     doTestConversion("Zm9vYmFy", strlen("Zm9vYmFy"), "666F6F626172", strlen("666F6F626172"));
 
+    doTestConversion(
+        "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t",
+        strlen("SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"),
+        "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d",
+        strlen("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")
+    );
+
 /*
    BASE64("") = ""
    BASE64("f") = "Zg=="
