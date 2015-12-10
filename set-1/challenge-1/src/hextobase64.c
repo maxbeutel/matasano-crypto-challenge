@@ -1,12 +1,10 @@
 #include <string.h>
+#include <stdio.h>
 #include <ctype.h>
 
 #include <assert.h>
 
 #include "hextobase64.h"
-
-// debug
-#include <stdio.h>
 
 char hexChars[16] = {
     '0',
